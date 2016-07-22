@@ -1,8 +1,7 @@
 package info.zhaocong.lab.flyingheart;
 
-import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
-import android.view.SurfaceHolder;
+import android.support.v7.app.AppCompatActivity;
 
 import butterknife.BindView;
 import butterknife.ButterKnife;
@@ -20,8 +19,13 @@ public class MainActivity extends AppCompatActivity {
         ButterKnife.bind(this);
     }
 
+    @OnClick(R.id.animation_panel)
+    void panelClicked(){
+        animationPanel.add();
+    }
+
     @OnClick(R.id.trigger)
-    void fire(){
+    void triggerClicked(){
         animationPanel.add();
     }
 

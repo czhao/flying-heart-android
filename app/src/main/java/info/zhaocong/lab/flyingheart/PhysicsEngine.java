@@ -1,8 +1,6 @@
 package info.zhaocong.lab.flyingheart;
 
 
-import android.util.Log;
-
 import javax.vecmath.Vector3f;
 
 /**
@@ -27,11 +25,10 @@ public class PhysicsEngine {
         //assume velocity X does not change over time
         float delaTimeF = (float)deltaTime;
         //apply the drag
-        //Log.d("delta", "delta value" + ((1 - spark.drag * delaTimeF/1000f) * spark.drag));
         //spark.mVelocity.scale((1 - spark.drag * delaTimeF / 200000f) * spark.drag);
         spark.mVelocity.get(velocity);
         //x
-        velocity[0] += WIND * (float)deltaTime / 1000f;
+        //velocity[0] += WIND * (float)deltaTime / 1000f;
         //y
         velocity[1] += (float)deltaTime * spark.gravity / 1000f;
         spark.mVelocity.set(velocity);

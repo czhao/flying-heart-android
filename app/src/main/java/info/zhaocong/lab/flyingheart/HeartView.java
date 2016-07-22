@@ -23,13 +23,17 @@ import javax.vecmath.Vector3f;
 public class HeartView extends SurfaceView {
 
     long time;
-    private boolean isShowOngoing = false;
+
+    //volatile for thread safety
+    private volatile boolean isShowOngoing = false;
     private List<SparkBase> sparks = new ArrayList<>();
     private ArrayList<SparkBase> recycleList = new ArrayList<>();
     private Random mRandom = new Random();
-    private ConcurrentLinkedQueue<SparkBase> waitingList = new ConcurrentLinkedQueue<>();
+    private final ConcurrentLinkedQueue<SparkBase> waitingList = new ConcurrentLinkedQueue<>();
 
     private Bitmap blue, pink, yellow;
+
+    private boolean isSurfaceReady = false;
 
     private Bitmap[] heartAssets = new Bitmap[3];
     SurfaceHolder mSurfaceHolder;
@@ -71,24 +75,30 @@ public class HeartView extends SurfaceView {
         mSurfaceHolder.addCallback(new SurfaceHolder.Callback() {
             @Override
             public void surfaceCreated(SurfaceHolder holder) {
+                isSurfaceReady = true;
                 play();
             }
 
             @Override
-            public void surfaceChanged(SurfaceHolder holder, int format, int width, int height) {
-            }
+            public void surfaceChanged(SurfaceHolder holder, int format, int width, int height) {}
 
             @Override
             public void surfaceDestroyed(SurfaceHolder holder) {
+                isSurfaceReady = false;
                 stop();
             }
         });
     }
 
-    protected void play(){
+    private void play(){
+        if (isShowOngoing || !isSurfaceReady){
+            return;
+        }
+
         time = System.currentTimeMillis();
         isShowOngoing = true;
 
+        //this thread will quit itself once the animation is done
         new Thread(){
             @Override
             public void run() {
@@ -107,22 +117,20 @@ public class HeartView extends SurfaceView {
                     }
                     sparks.removeAll(recycleList);
                     recycleList.clear();
-                    if (sparks.size() > 0) {
-                        //do nothing
-                    } else {
-                        try {
-                            //60fps if possible
-                            Thread.sleep(16);
-                        } catch (Exception e) {
-                            //DO NOTHING
-                        }
-                    }
                     //randomFire();
                     time = newTime;
                     getHolder().unlockCanvasAndPost(canvas);
-                    while (waitingList.size() > 0){
-                        //remove the item
-                        sparks.add(waitingList.poll());
+
+                    synchronized (waitingList) {
+                        while (waitingList.size() > 0) {
+                            //remove the item
+                            sparks.add(waitingList.poll());
+                        }
+                        if (sparks.size() == 0) {
+                            //do nothing
+                            isShowOngoing = false;
+                            break;
+                        }
                     }
                 }
             }
@@ -135,19 +143,23 @@ public class HeartView extends SurfaceView {
 
     public void add(){
         float x =  getMeasuredWidth() /2  + (mRandom.nextFloat() > .5f ? 1f : -1f) * mRandom.nextFloat() * getMeasuredWidth() /4;
-        float y =  getMeasuredHeight();
+        float y =  getMeasuredHeight() - 100;
         float z = 0;
-
         int lifeSpan = 3000 + mRandom.nextInt(2000); //ms
-
         Point3f pos = new Point3f(x, y, z);
         //the vertical speed cannot be faster than the frame rate
-        Vector3f v = new Vector3f(30f, -y / (lifeSpan/1000), 20f);
-
+        Vector3f v = new Vector3f(mRandom.nextFloat() * 20f, -y / (lifeSpan/1000), 20f);
         int choice = mRandom.nextInt(3);
-        float scale = mRandom.nextFloat() * 0.4f + 0.3f;
+        float scale = mRandom.nextFloat() * 0.5f + 0.5f;
         Heart h = new Heart(pos, v, heartAssets[choice], lifeSpan, scale);
-        waitingList.add(h);
+
+        synchronized (waitingList) {
+            waitingList.add(h);
+            //resume the animation
+            if (!isShowOngoing) {
+                play();
+            }
+        }
     }
 
     public  class Heart extends SparkBase {
@@ -177,7 +189,7 @@ public class HeartView extends SurfaceView {
             if (initWidth < width){
                 latest.left = (int)screenX - initWidth /2;
                 latest.right = latest.left + initWidth;
-                initWidth += 5;
+                initWidth += 8;
             }else {
                 latest.left = (int)screenX - width /2;
                 latest.right = latest.left + width;
@@ -186,7 +198,7 @@ public class HeartView extends SurfaceView {
             if (initHeight < height){
                 latest.top = (int)screenY + initHeight / 2;
                 latest.bottom = latest.top + initHeight;
-                initHeight += 5;
+                initHeight += 8;
             }else {
                 latest.top = (int)screenY  + height / 2;
                 latest.bottom = latest.top + height;

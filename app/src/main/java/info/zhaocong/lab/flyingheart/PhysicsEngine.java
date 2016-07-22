@@ -1,20 +1,14 @@
 package info.zhaocong.lab.flyingheart;
 
 
-import javax.vecmath.Vector3f;
-
 /**
- * PLEASE FILL IN THE CLASS DESCRIPTION
+ * Simple Physics Engine to manipulate the movement
  *
  * @author zhaocong
  */
 public class PhysicsEngine {
 
     private static final float WIND = -0.1f;
-
-    static float[] velocity = new float[3];
-
-    static Vector3f tempV = new Vector3f();
 
     /**
      * Apply the simple physics to calculate the position
@@ -23,18 +17,14 @@ public class PhysicsEngine {
     static void move(SparkBase spark, long deltaTime){
         //calculate the change in velocity
         //assume velocity X does not change over time
-        float delaTimeF = (float)deltaTime;
         //apply the drag
         //spark.mVelocity.scale((1 - spark.drag * delaTimeF / 200000f) * spark.drag);
-        spark.mVelocity.get(velocity);
+        float timeDiff = (float)deltaTime / 1000f;
         //x
-        //velocity[0] += WIND * (float)deltaTime / 1000f;
+        spark.mVelocity.x += WIND * timeDiff;
         //y
-        velocity[1] += (float)deltaTime * spark.gravity / 1000f;
-        spark.mVelocity.set(velocity);
-        tempV.set(velocity);
-        tempV.scale(delaTimeF / 1000f);
-        spark.mPosition.add(tempV);
+        spark.mVelocity.y += timeDiff * spark.gravity;
+        spark.mPosition.offset(timeDiff * spark.mVelocity.x , timeDiff * spark.mVelocity.y);
     }
 
 }

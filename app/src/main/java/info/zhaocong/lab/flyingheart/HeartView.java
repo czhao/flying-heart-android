@@ -12,9 +12,6 @@ import java.util.List;
 import java.util.Random;
 import java.util.concurrent.ConcurrentLinkedQueue;
 
-import javax.vecmath.Point3f;
-import javax.vecmath.Vector3f;
-
 /**
  * Heart flying animation
  *
@@ -37,6 +34,8 @@ public class HeartView extends SurfaceView {
 
     private Bitmap[] heartAssets = new Bitmap[3];
     SurfaceHolder mSurfaceHolder;
+
+    private final int MAX_CONCURRENT_ANIMATION = 20;
 
     private Paint paint = new Paint();
 
@@ -117,12 +116,11 @@ public class HeartView extends SurfaceView {
                     }
                     sparks.removeAll(recycleList);
                     recycleList.clear();
-                    //randomFire();
                     time = newTime;
                     getHolder().unlockCanvasAndPost(canvas);
 
                     synchronized (waitingList) {
-                        while (waitingList.size() > 0) {
+                        while (waitingList.size() > 0 && sparks.size() < MAX_CONCURRENT_ANIMATION) {
                             //remove the item
                             sparks.add(waitingList.poll());
                         }
@@ -131,6 +129,12 @@ public class HeartView extends SurfaceView {
                             isShowOngoing = false;
                             break;
                         }
+                    }
+
+                    try {
+                        sleep(16L); //aim to maintain 60fps
+                    } catch (InterruptedException e) {
+                        isShowOngoing = false;
                     }
                 }
             }
@@ -146,18 +150,20 @@ public class HeartView extends SurfaceView {
         float y =  getMeasuredHeight() - 100;
         float z = 0;
         int lifeSpan = 3000 + mRandom.nextInt(2000); //ms
-        Point3f pos = new Point3f(x, y, z);
+        PointF pos = new PointF(x, y);
         //the vertical speed cannot be faster than the frame rate
-        Vector3f v = new Vector3f(mRandom.nextFloat() * 20f, -y / (lifeSpan/1000), 20f);
+        PointF v = new PointF(mRandom.nextFloat() * 20f, -y / (lifeSpan/1000));
         int choice = mRandom.nextInt(3);
         float scale = mRandom.nextFloat() * 0.5f + 0.5f;
         Heart h = new Heart(pos, v, heartAssets[choice], lifeSpan, scale);
 
         synchronized (waitingList) {
-            waitingList.add(h);
-            //resume the animation
-            if (!isShowOngoing) {
-                play();
+            if (waitingList.size() < 2* MAX_CONCURRENT_ANIMATION){
+                waitingList.add(h);
+                //resume the animation
+                if (!isShowOngoing) {
+                    play();
+                }
             }
         }
     }
@@ -170,7 +176,7 @@ public class HeartView extends SurfaceView {
         private int width, height;
         private int initWidth = 1, initHeight = 1;
 
-        public Heart(Point3f p, Vector3f v, Bitmap choice, long lifeSpan, float scale) {
+        public Heart(PointF p, PointF v, Bitmap choice, long lifeSpan, float scale) {
             super(p, v);
             gravity = 0;
             drag = 0f;

@@ -30,12 +30,17 @@ public class HeartView extends SurfaceView {
 
     private Bitmap blue, pink, yellow;
 
-    private boolean isSurfaceReady = false;
+    private boolean isSurfaceReady = false, isDataReady = false;
 
     private Bitmap[] heartAssets = new Bitmap[3];
     SurfaceHolder mSurfaceHolder;
 
     private final int MAX_CONCURRENT_ANIMATION = 20;
+
+    private PointF[] startPoints = new PointF[MAX_CONCURRENT_ANIMATION];
+    private PointF[] velocities = new PointF[MAX_CONCURRENT_ANIMATION];
+    private int[] lifeSpans = new int[MAX_CONCURRENT_ANIMATION];
+    private Point[] imageDimensions = new Point[MAX_CONCURRENT_ANIMATION];
 
     private Paint paint = new Paint();
 
@@ -104,19 +109,26 @@ public class HeartView extends SurfaceView {
                 while (isShowOngoing) {
                     long newTime = System.currentTimeMillis();
                     long timeDelta = newTime - time;
-                    Canvas canvas = getHolder().lockCanvas();
-                    canvas.drawColor(Color.WHITE, PorterDuff.Mode.CLEAR);
+
                     for (SparkBase s : sparks) {
                         if (s.isExploding()) {
                             recycleList.add(s);
                         } else {
                             PhysicsEngine.move(s, timeDelta);
-                            s.draw(canvas, s.mPosition.x, s.mPosition.y ,0, true);
                         }
                     }
+
                     sparks.removeAll(recycleList);
                     recycleList.clear();
                     time = newTime;
+
+                    Canvas canvas = getHolder().lockCanvas();
+                    canvas.drawColor(Color.WHITE, PorterDuff.Mode.CLEAR);
+
+                    for (SparkBase s : sparks) {
+                        s.draw(canvas, s.mPosition.x, s.mPosition.y ,0, true);
+                    }
+
                     getHolder().unlockCanvasAndPost(canvas);
 
                     synchronized (waitingList) {
@@ -146,16 +158,31 @@ public class HeartView extends SurfaceView {
     }
 
     public void add(){
-        float x =  getMeasuredWidth() /2  + (mRandom.nextFloat() > .5f ? 1f : -1f) * mRandom.nextFloat() * getMeasuredWidth() /4;
-        float y =  getMeasuredHeight() - 100;
-        float z = 0;
-        int lifeSpan = 3000 + mRandom.nextInt(2000); //ms
-        PointF pos = new PointF(x, y);
-        //the vertical speed cannot be faster than the frame rate
-        PointF v = new PointF(mRandom.nextFloat() * 20f, -y / (lifeSpan/1000));
-        int choice = mRandom.nextInt(3);
-        float scale = mRandom.nextFloat() * 0.5f + 0.5f;
-        Heart h = new Heart(pos, v, heartAssets[choice], lifeSpan, scale);
+
+        if (!isDataReady) {
+
+            //as our image has the same size
+            int imgWidth = heartAssets[0].getWidth();
+            int imgHeight = heartAssets[0].getHeight();
+
+            //pre-calculate the location
+            for (int i = 0; i < MAX_CONCURRENT_ANIMATION; i++) {
+                int lifeSpan = 3000 + mRandom.nextInt(2000); //ms
+                lifeSpans[i] = lifeSpan;
+                float x = getMeasuredWidth() / 2 +
+                        (mRandom.nextFloat() > .5f ? 1f : -1f) * mRandom.nextFloat() * getMeasuredWidth() / 4;
+                float y = getMeasuredHeight() - 100;
+                startPoints[i] = new PointF(x, y);
+                velocities[i] =  new PointF(mRandom.nextFloat() * 20f, -y / (lifeSpan/1000));
+                float scale = mRandom.nextFloat() * 0.5f + 0.5f;
+                imageDimensions[i] = new Point((int)(imgWidth * scale), (int)(imgHeight * scale));
+            }
+            isDataReady = true;
+        }
+
+        int random = mRandom.nextInt(MAX_CONCURRENT_ANIMATION);
+
+        Heart h = new Heart(startPoints[random], velocities[random], heartAssets[random % 3], lifeSpans[random], imageDimensions[random]);
 
         synchronized (waitingList) {
             if (waitingList.size() < 2* MAX_CONCURRENT_ANIMATION){
@@ -176,14 +203,14 @@ public class HeartView extends SurfaceView {
         private int width, height;
         private int initWidth = 1, initHeight = 1;
 
-        public Heart(PointF p, PointF v, Bitmap choice, long lifeSpan, float scale) {
+        public Heart(PointF p, PointF v, Bitmap choice, long lifeSpan, Point dimension) {
             super(p, v);
             gravity = 0;
             drag = 0f;
             heart = choice;
             mLifespan = lifeSpan;
-            width = (int)(choice.getWidth() * scale);
-            height = (int)(choice.getHeight() * scale);
+            width = dimension.x;
+            height = dimension.y;
             latest = new Rect(0,0,0,0);
         }
 
